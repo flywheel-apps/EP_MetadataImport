@@ -1,0 +1,71 @@
+{
+  "name": "import-metadata",
+  "label": "Import Metadata",
+  "description": "A utility for gradient guidance reconstruction",
+  "author": "Flywheel SSE",
+  "maintainer": "Flywheel <support@flywheel.io>",
+  "license": "Other",
+  "source": "https://github.com/suiyao/GGR-recon",
+  "url": "https://github.com/flywheel-apps/GGR-fw",
+  "version": "0.0.0_0.0.0",
+  "custom": {
+    "gear-builder": {
+      "category": "analysis",
+      "image": "flywheel/ggr-fw:0.0.0_0.0.0"
+    }
+  },
+  
+  "inputs": {
+    "input_file": {
+      "base": "file",
+      "optional": false
+
+    },
+    "column_map": {
+      "base": "file",
+      "optional": true,
+      "description": "A yaml mapping file to match column headers to metadata points."
+    }
+
+  },
+  
+  "config": {
+    "subjectID_Column": {
+      "optional": false,
+      "description": "The name of the column that contains subject ID's",
+      "type": "string"
+    },
+    "first_row": {
+      "optional": false,
+      "default": 1,
+      "description": "The first row that contains data (usually the column headers)",
+      "type": "integer"
+    },
+    "delimiter": {
+      "optional": false,
+      "description": "delimiter (if file is not excel)",
+      "type": "string",
+      "enum": [
+                "/t",
+                ",",
+                "/s"
+            ],
+       "default": ","
+
+    },
+    "sheets": {
+      "optional": true,
+      "description": "If using an excel file, which sheet(s) should be imported (comma separated, 'sheet1, sheet2, etc')?  Note that each sheet must have a 'SubjectID Column'.",
+      "type": "string"
+    },
+    "info_category": {
+      "optional": true,
+      "description": "A parent metadata category to store store the info under.",
+      "type": "string"
+    }
+  },
+  "environment": {
+
+  },
+  "command": "/flywheel/v0/compiled/run_GGR_wrapper.sh /opt/mcr/v98"
+}

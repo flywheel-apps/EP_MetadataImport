@@ -83,6 +83,13 @@ def import_data(fw,
         try:
             upload_obj = df.iloc[row]
             object_name = upload_obj.get(mapping_column)
+            
+            log.info(f'\n==========================================\n'
+                       f'Setting Metadata For {object_name}\n'
+                       f'------------------------------------------')
+            log.info(upload_obj)
+            
+            
             matches = [m for m in objects_for_processing if m.get(name) == object_name]
             
             if len(matches) > 1:
@@ -116,13 +123,25 @@ def import_data(fw,
             if dry_run:
                 log.info(f"Would modify info on {address}")
                 df.loc[df.index == row, 'Gear_Status'] = 'Dry-Run Success'
+                log.info('\n------------------------------------------\n'
+                         'DRYRUN STATUS: Success\n'
+                         '==========================================\n')
             else:
                 update_data = update(current_info, data, overwrite)
                 match.update_info(update_data)
                 df.loc[df.index == row, 'Gear_Status'] = 'Success'
+                log.info('\n------------------------------------------\n'
+                         'STATUS: Success\n'
+                         '==========================================\n')
+
         
         except Exception as e:
-            log.warning(f"row {row} unable to process for reason: {e}")
+
+            log.warning(f'\n------------------------------------------\n'
+                     f'DRYRUN STATUS: Failed\n'
+                     f'row {row} unable to process for reason: {e}'
+                     f'==========================================\n')
+            
             log.exception(e)
     
     return df

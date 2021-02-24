@@ -1,6 +1,4 @@
 import pandas as pd
-from pathlib import Path
-import mapping_class as mc
 import logging
 
 log=logging.getLogger(__name__)

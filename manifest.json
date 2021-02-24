@@ -7,7 +7,7 @@
   "license": "Other",
   "source": "a",
   "url": "b",
-  "version": "0.0.0_0.0.0w",
+  "version": "0.0.0_0.0.0z",
   "custom": {
     "gear-builder": {
       "category": "analysis",
@@ -92,5 +92,5 @@
   "environment": {
 
   },
-  "command": "python3.9 /flywheel/v0/run.py"
+  "command": "python3.7 /flywheel/v0/run.py"
 }

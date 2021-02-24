@@ -1,1 +1,4 @@
+flywheel-sdk==14.4.0
+flywheel_gear_toolkit
 pandas
+rtstatlib

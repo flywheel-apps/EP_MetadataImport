@@ -260,8 +260,8 @@ def generate_path_to_container(
     except Exception:
         ct = 'analysis'
     
+    
     if ct == "file":
-        
         path_to_file = generate_path_to_container(
             fw,
             container.parent.reload(),
@@ -336,8 +336,8 @@ def generate_path_to_container(
         
         fw_path += append
         
-        append = f"/{container.label}"
-        
-        fw_path += append
+        # append = f"/{container.label}"
+        # 
+        # fw_path += append
         
     return fw_path

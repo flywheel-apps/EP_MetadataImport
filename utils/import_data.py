@@ -45,7 +45,7 @@ def get_objects_for_processing(fw, destination_container, level, get_files):
     if get_files:
         resulting_containers = []
         for cc in child_containers:
-            resulting_containers.extend(fh.get_containers_at_level(fw, cc, "file"))
+            resulting_containers.extend(fh.get_containers_at_level(fw, cc.reload(), "file"))
         
     else:
         resulting_containers = child_containers
@@ -77,6 +77,7 @@ def import_data(fw,
     df['Gear_Status'] = 'Failed'
     df['Gear_FW_Location'] = None
     
+    success_counter = 0
     
     for row in range(nrows):
         
@@ -95,10 +96,16 @@ def import_data(fw,
             if len(matches) > 1:
                 log.warning(f"Multiple matches for for object name '{object_name}'. "
                             f"please get better at specifying flywheel objects.")
+                log.info('\n------------------------------------------\n'
+                         'STATUS: Failed\n'
+                         '==========================================\n')
                 continue
                 
             elif len(matches) == 0:
                 log.warning(f"No match for object name '{object_name}'.")
+                log.info('\n------------------------------------------\n'
+                         'STATUS: Failed\n'
+                         '==========================================\n')
                 continue
             
             match = matches[0]
@@ -110,6 +117,9 @@ def import_data(fw,
             data = upload_obj.to_dict()
             
             data.pop(mapping_column)
+            data.pop('Gear_Status')
+            data.pop('Gear_FW_Location')
+            
             levels = metadata_destination.split('.')
             
             if levels[0] == "info":
@@ -126,23 +136,38 @@ def import_data(fw,
                 log.info('\n------------------------------------------\n'
                          'DRYRUN STATUS: Success\n'
                          '==========================================\n')
+                success_counter += 1
             else:
+                
+                log.info(f'updating {current_info}')
+                
                 update_data = update(current_info, data, overwrite)
+                log.debug(f'Raw Data:\n{update_data}\n')
                 match.update_info(update_data)
                 df.loc[df.index == row, 'Gear_Status'] = 'Success'
                 log.info('\n------------------------------------------\n'
                          'STATUS: Success\n'
                          '==========================================\n')
 
+                success_counter += 1
         
         except Exception as e:
 
             log.warning(f'\n------------------------------------------\n'
-                     f'DRYRUN STATUS: Failed\n'
-                     f'row {row} unable to process for reason: {e}'
-                     f'==========================================\n')
+                        f'DRYRUN STATUS: Failed\n'
+                        f'row {row} unable to process for reason: {e}'
+                        f'==========================================\n')
             
             log.exception(e)
+    
+    
+    
+    log.info(f"\n\n"
+             f"===============================================================================\n"
+             f"Final Report: {success_counter}/{nrows} objects updated successfully\n"
+             f"{success_counter/nrows*100}%\n"
+             f"See output report file for more details"
+             f"===============================================================================\n")
     
     return df
         
@@ -154,19 +179,25 @@ def save_df_to_csv(df, output_dir):
 
 
 def update(d, u, overwrite):
+    
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):
             d[k] = update(d.get(k, {}), v, overwrite)
         else:
-            # Flywheel doesn't like np.bool_ type.  
-            if isinstance(v, np.bool_):
-                v = bool(v)
-                
+            # Flywheel doesn't like numpy data types:
+            if type(v).__module__ == np.__name__:
+                v = v.item()
+            
+            log.debug(f'checking if "{k}" in {d.keys()}')
             if k in d:
                 if overwrite:
-                    
+                    log.debug(f'Overwriting "{k}" from "{d[k]}" to "{v}"')
                     d[k] = v
+                else:
+                    log.debug(f'"{k}" present.  Skipping.')
             else:
+                log.debug(f"setting {k}")
                 d[k] = v
         
     return d
+# https://gist.github.com/angstwad/bf22d1822c38a92ec0a9

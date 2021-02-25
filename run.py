@@ -1,4 +1,5 @@
 from pathlib import Path
+import pathvalidate as pv
 import sys
 
 import flywheel
@@ -30,7 +31,18 @@ def main(context):
     if csv_file is None or not Path(csv_file).exists():
         log.error('No file provided or file does not exist')
         return 1
+    
     csv_file = Path(csv_file)
+    name = csv_file.stem
+    valid_name = pv.sanitize_filename(name)
+    
+    if len(valid_name) == 0:
+        log.error('You made your filename entirely out of invalid characters.'
+                  'Just go home and think about that.'
+                  'You are a danger to computers.')
+        return 1
+        
+    valid_name = valid_name.replace(' ', '_')
     
     dry_run = config.get('dry-run', False)
     log.debug(f"dry_run is {dry_run}")
@@ -38,7 +50,7 @@ def main(context):
     first_row = config.get('first_row', 0)
     log.debug(f"Data starting on row{first_row}")
     
-    metadata_destination = config.get("metadata_destination", "info")
+    metadata_destination = config.get("metadata_destination", valid_name)
     log.debug(f"Saving metadata to {metadata_destination}")
     
     mapping_column = config.get("mapping_column", 0)
@@ -61,28 +73,36 @@ def main(context):
         log.error(f"invalid destination {destination_level}")
         return 1
     
-    destination_id = context.destination.get('id')
-    dest_container = fw.get(destination_id)
+    try:
     
-    df = ld.load_text_dataframe(csv_file, first_row, delimiter)
-    mapping_column = ld.validate_df(df, mapping_column)
+        destination_id = context.destination.get('id')
+        dest_container = fw.get(destination_id)
+        
+        df = ld.load_text_dataframe(csv_file, first_row, delimiter)
+        mapping_column = ld.validate_df(df, mapping_column)
+        
+        objects_for_processing = id.get_objects_for_processing(fw,
+                                                               dest_container,
+                                                               object_type,
+                                                               attached_files)
+        
+        df = id.import_data(fw,
+                            df,
+                       mapping_column,
+                       objects_for_processing,
+                       attached_files,
+                       metadata_destination,
+                       overwrite,
+                       dry_run)
+        
+        report_output = context.output_dir
+        id.save_df_to_csv(df, report_output)
     
-    objects_for_processing = id.get_objects_for_processing(fw,
-                                                           dest_container,
-                                                           object_type,
-                                                           attached_files)
-    
-    df = id.import_data(fw,
-                        df,
-                   mapping_column,
-                   objects_for_processing,
-                   attached_files,
-                   metadata_destination,
-                   overwrite,
-                   dry_run)
-    
-    report_output = context.output_dir
-    id.save_df_to_csv(df, report_output)
+    except Exception as e:
+        log.exception(e)
+        return 1
+     
+    return 0
     
 
 

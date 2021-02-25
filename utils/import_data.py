@@ -166,7 +166,7 @@ def import_data(fw,
              f"===============================================================================\n"
              f"Final Report: {success_counter}/{nrows} objects updated successfully\n"
              f"{success_counter/nrows*100}%\n"
-             f"See output report file for more details"
+             f"See output report file for more details\n"
              f"===============================================================================\n")
     
     return df

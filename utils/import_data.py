@@ -83,11 +83,14 @@ def import_data(fw,
         
         try:
             upload_obj = df.iloc[row]
+            upload_obj.pop('Gear_Status')
+            upload_obj.pop('Gear_FW_Location')
+            
             object_name = upload_obj.get(mapping_column)
             
-            log.info(f'\n==========================================\n'
+            log.info(f'\n==================================================\n'
                        f'Setting Metadata For {object_name}\n'
-                       f'------------------------------------------')
+                       f'--------------------------------------------------')
             log.info(upload_obj)
             
             
@@ -96,16 +99,16 @@ def import_data(fw,
             if len(matches) > 1:
                 log.warning(f"Multiple matches for for object name '{object_name}'. "
                             f"please get better at specifying flywheel objects.")
-                log.info('\n------------------------------------------\n'
+                log.info('\n--------------------------------------------------\n'
                          'STATUS: Failed\n'
-                         '==========================================\n')
+                         '==================================================\n')
                 continue
                 
             elif len(matches) == 0:
                 log.warning(f"No match for object name '{object_name}'.")
-                log.info('\n------------------------------------------\n'
+                log.info('\n--------------------------------------------------\n'
                          'STATUS: Failed\n'
-                         '==========================================\n')
+                         '==================================================\n')
                 continue
             
             match = matches[0]
@@ -117,8 +120,7 @@ def import_data(fw,
             data = upload_obj.to_dict()
             
             data.pop(mapping_column)
-            data.pop('Gear_Status')
-            data.pop('Gear_FW_Location')
+
             
             levels = metadata_destination.split('.')
             
@@ -133,30 +135,30 @@ def import_data(fw,
             if dry_run:
                 log.info(f"Would modify info on {address}")
                 df.loc[df.index == row, 'Gear_Status'] = 'Dry-Run Success'
-                log.info('\n------------------------------------------\n'
+                log.info('\n--------------------------------------------------\n'
                          'DRYRUN STATUS: Success\n'
-                         '==========================================\n')
+                         '==================================================\n')
                 success_counter += 1
             else:
                 
-                log.info(f'updating {current_info}')
-                
+                log.debug(f'Data from CSV    :\n{current_info}')
                 update_data = update(current_info, data, overwrite)
-                log.debug(f'Raw Data:\n{update_data}\n')
+                
+                log.debug(f'Data after update:\n{update_data}\n')
                 match.update_info(update_data)
                 df.loc[df.index == row, 'Gear_Status'] = 'Success'
-                log.info('\n------------------------------------------\n'
+                log.info('\n--------------------------------------------------\n'
                          'STATUS: Success\n'
-                         '==========================================\n')
+                         '==================================================\n')
 
                 success_counter += 1
         
         except Exception as e:
 
-            log.warning(f'\n------------------------------------------\n'
+            log.warning(f'\n--------------------------------------------------\n'
                         f'DRYRUN STATUS: Failed\n'
                         f'row {row} unable to process for reason: {e}'
-                        f'==========================================\n')
+                        f'==================================================\n')
             
             log.exception(e)
     

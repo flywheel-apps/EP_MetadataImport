@@ -62,7 +62,7 @@ def main(context):
     delimiter = config.get("delimiter", ",")
     log.debug(f"Using Delimiter: {delimiter}")
     
-    object_type = config.get("object_type")
+    object_type = config.get("container_type")
     log.debug(f"Looking for matching labels for container type {object_type}")
     
     attached_files = config.get('attached_files')

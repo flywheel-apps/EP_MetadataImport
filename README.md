@@ -126,7 +126,7 @@ OriginalImage[Width,Height]              3532,3451
 OriginalImagePixelSpacing[x,y]         0.033,0.643
 
 Name: 0, dtype: object
-[ 20210225 17:41:22     INFO __main__] updating {'Data_Entry_2017_test': {'csv': {'Finding Labels': 'No Finding', 'Follow-up #': 9, 'Patient ID': 500, 'Patient Age': 76, 'Patient Gender': 'F', 'View Position': 'PA', 'OriginalImage[Width,Height]': '2502,2991', 'OriginalImagePixelSpacing[x,y]': '0.143,0.143'}}, 'Test_Struct': {'Finding Labels': 'No Finding', 'Follow-up #': 9, 'Patient ID': 500, 'Patient Age': 76, 'Patient Gender': 'F', 'View Position': 'PA', 'OriginalImage[Width,Height]': '2502,2991', 'OriginalImagePixelSpacing[x,y]': '0.143,0.143'}}
+[ 20210225 17:41:22     INFO __main__] updating {'Data_Entry_2017_test': {'csv': {'Finding Labels': 'No Finding', 'Follow-up #': 3, 'Patient ID': 340, 'Patient Age': 33, 'Patient Gender': 'F', 'View Position': 'AF', 'OriginalImage[Width,Height]': '3532,3451', 'OriginalImagePixelSpacing[x,y]': '0.033,0.643'}}
 [ 20210225 17:41:22     INFO __main__] 
 --------------------------------------------------
 STATUS: Success

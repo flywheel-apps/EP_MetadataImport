@@ -40,8 +40,11 @@ def get_objects_for_processing(fw, destination_container, level, get_files):
     log.debug(f"looking for {level} on container {destination_container.label}.  Files: {get_files}")
     
     project = destination_container.parents.project
+    log.debug(f'parents: {destination_container.parents}')
     project = fw.get(project).reload()
+    log.debug(f'Got project {project.label}')
     child_containers = fh.get_containers_at_level(fw, project, level)
+    log.debug(f"Initial Pass: found {len(child_containers)} containers")
     if get_files:
         resulting_containers = []
         for cc in child_containers:
@@ -50,6 +53,12 @@ def get_objects_for_processing(fw, destination_container, level, get_files):
     else:
         resulting_containers = child_containers
     
+    log.debug(f"Final Pass: found {len(child_containers)} containers:")
+    for cc in resulting_containers:
+        if get_files:
+            log.debug(f"{cc.name}")
+        else:
+            log.debug(f"{cc.label}")
     return resulting_containers
     
     
@@ -202,4 +211,6 @@ def update(d, u, overwrite):
                 d[k] = v
         
     return d
+
+
 # https://gist.github.com/angstwad/bf22d1822c38a92ec0a9

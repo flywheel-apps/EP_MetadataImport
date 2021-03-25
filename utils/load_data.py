@@ -21,7 +21,8 @@ def load_excel_dataframe(excel_path, firstrow_spec, sheets_spec=0):
 def load_text_dataframe(df_path, firstrow_spec, delimiter_spec):
     
     df = pd.read_table(df_path, delimiter=delimiter_spec, header=firstrow_spec-1)
-
+    df = df.fillna(value='')
+    
     return df
 
 def validate_df(df, object_col):

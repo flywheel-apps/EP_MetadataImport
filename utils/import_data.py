@@ -2,8 +2,7 @@ import collections.abc
 import numpy as np
 
 import logging
-
-from utils import flywheel_helpers as fh
+import flywheel_helpers as fh
 
 # df_path = '/Users/davidparker/Documents/Flywheel/SSE/MyWork/Gears/Metadata_import_Errorprone/Data_Entry_2017_test.csv'
 # firstrow_spec = 1

@@ -60,28 +60,28 @@ def run_query_on_finder(finders, query):
     
     return results
 
-
-def get_finders_from_container(fw, find_type, container):
-    
-    if not find_type in valid_finder_types:
-        log.warning(f"{find_type} is not a valid finder type")
-        return []
-    
-    if find_type in ['analysis', 'files']:
-        pass
-        
-    
-    if container is None:
-        finders = getattr(fw, find_type)
-    
-    else:
-        if not hasattr(container, find_type):
-            
-
-        if hasattr(container, find_type):
-            pass
-        pass
-    pass
+# 
+# def get_finders_from_container(fw, find_type, container):
+#     
+#     if not find_type in valid_finder_types:
+#         log.warning(f"{find_type} is not a valid finder type")
+#         return []
+#     
+#     if find_type in ['analysis', 'files']:
+#         pass
+#         
+#     
+#     if container is None:
+#         finders = getattr(fw, find_type)
+#     
+#     else:
+#         if not hasattr(container, find_type):
+#             
+# 
+#         if hasattr(container, find_type):
+#             pass
+#         pass
+#     pass
 
 
 def get_finders_at_level(fw, container, level):
@@ -197,12 +197,20 @@ def get_containers_at_level(fw, container, level):
 
 
 def run_finder_at_level(fw, container, level, query):
-    print(query)
-    try:
-        ct = container.container_type
-    except Exception:
-        ct = 'analysis'
+    
+    
+    
+    if container is None:
+        ct = 'instance'
+    else:
+        try:
+            ct = container.container_type
+        except Exception:
+            ct = 'analysis'
 
+    log.info(
+        f"looking for {level} matching {query} on {ct}")
+    
     if ct == level:
         return ([container])
 
@@ -228,7 +236,7 @@ def run_finder_at_level(fw, container, level, query):
     elif level == "session":
         log.info('querying sessions')
         if container is None:
-            containers = [fw.sessions.find_one(query)]
+            containers = [fw.sessions.find(query)]
         else:
             # Expanding To Children
             if ct == "project" or 'subject':
@@ -241,7 +249,9 @@ def run_finder_at_level(fw, container, level, query):
     elif level == "subject":
         log.info('querying subjects')
         if container is None:
-            containers = [fw.subjects.find_one(query)]
+            log.info('container is None')
+            containers = fw.subjects.find(query)
+            log.info(containers)
         else:
             # Expanding To Children
             if ct == "project":
@@ -254,7 +264,7 @@ def run_finder_at_level(fw, container, level, query):
     elif level == "project":
         log.info('querying projects')
         if container is None:
-            containers = [fw.projects.find_one(query)]
+            containers = fw.projects.find(query)
         else:
             # Expand group to children projects:
             containers = container.projects.find(query)
@@ -662,7 +672,6 @@ def find_flywheel_container(fw, name, level, on_container = None):
                 
     elif level == "analysis" or level == "file":
         container = run_finder_at_level(fw, on_container, level, name)
-        container, found = check_for_multiple(container, level, name)
         
     if not found:
         if re.match(CONTAINER_ID_FORMAT, name):
@@ -672,15 +681,14 @@ def find_flywheel_container(fw, name, level, on_container = None):
                 if len(container) > 0:
                     container = container[0]
                     
-                container, found = check_for_multiple(container, level, name)
             
             except flywheel.ApiException:
                 log.debug(f"{level} name {name} is not an ID.  Looking for Labels.")
 
         if not found:
-            query = f"label={name}"
+            query = f"label=\"{name}\""
             container = run_finder_at_level(fw, on_container, level, query)
-            container, found = check_for_multiple(container, level, name)
+            #log.info(container)
 
 
     
@@ -759,15 +767,15 @@ def check_for_multiple(container, level, name):
         
     return container, found
 
-
-if __name__ == "__main__":
-    query = "label=XR"
-    level = "acquisition"
-    container = '602eb7d7c0f6a53b3783e970'
-    fw = flywheel.Client()
-    container = fw.get_session('6039523c13ed9475c86e8aec')
-
-    containers = run_finder_at_level(fw, container, level, query)
-    for c in containers:
-        print(c.label)
-        
+# 
+# if __name__ == "__main__":
+#     query = "label=XR"
+#     level = "acquisition"
+#     container = '602eb7d7c0f6a53b3783e970'
+#     fw = flywheel.Client()
+#     container = fw.get_session('6039523c13ed9475c86e8aec')
+# 
+#     containers = run_finder_at_level(fw, container, level, query)
+#     for c in containers:
+#         print(c.label)
+#         

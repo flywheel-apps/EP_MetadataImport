@@ -1,13 +1,15 @@
 import re
-import utils.flywheel_helpers as fh
+import flywheel_helpers as fh
 import logging
 import collections
 import flywheel
-import utils.import_data as id
+import import_data as id
 import numpy as np
 import pandas as pd
 
+logging.basicConfig(level="DEBUG")
 log = logging.getLogger()
+log.setLevel("DEBUG")
 
 
 
@@ -18,9 +20,12 @@ class FlywheelObjectFinder:
         
         self.client = fw
 
-        
-        self.level = None
-        self.highest_level = None
+        self.CONTAINER_ID_FORMAT = "^[0-9a-fA-F]{24}$"
+        self.level = level
+        self.object = None
+        self.highest_container = None
+        self.lowest_level = 'file'
+        self.highest_level = 'group'
         
         self.group = {"id": group,
                         "obj": None,
@@ -49,18 +54,17 @@ class FlywheelObjectFinder:
         
         self.file = {"id": file,
                         "obj": None,
-                        "parent": self.highest_level,
+                        "parent": self.lowest_level,
                         "type": "file"}
         
         self.analysis = {"id": analysis,
                         "obj": None,
-                        "parent": self.highest_level,
+                        "parent": self.lowest_level,
                         "type": "analysis"}
         
         
-        self.level = level
-        self.object = None
-        self.highest_container = None
+
+        self.find_levels()
     
     
     def check_for_file(self, container):
@@ -116,166 +120,407 @@ class FlywheelObjectFinder:
             self.highest_level = 'group'
     
     
-    
-    def find_object(self, object_type, from_container):
+    def find_levels(self):
+        order = ["group","project","subject","session","acquisition","analysis","file"]
         
-        working_object = getattr(self, from_container)
-        parent = working_object.get('parent')
-        
-        
-        if parent.get("obj") is None:
-            
-            if parent.get("parent") is None:
-                object = fh.find_flywheel_container(self.client, working_object.get("id"), object_type, None)
-            else:
-                object = self.find_object(object_type, parent.get("type"))
-        
-        
-        else:
-            object = []
-            for parent in parent.get("obj"):
-                object.extend(
-                    fh.find_flywheel_container(self.client, working_object.get("id"), working_object.get("type"), parent))
+        for o in order[::-1]:
+            test_case = getattr(self, o)
+            if test_case.get("id") is not None:
+                self.highest_level = o
+
+        for o in order[:-1]:
+            test_case = getattr(self, o)
+            if test_case.get("id") is not None:
+                self.lowest_level = o
                 
+        log.info(f'highest level is {self.highest_level}')
+        log.info(f"lowest level is {self.lowest_level}")
+
+    
+    def process_matches(self, object_type, from_container=None):
+        
+        working_object = getattr(self, object_type)
+        parent = working_object.get("parent")
+                
+        # Case 1, if this is the highest level that has a label provided, do a flywheel
+        # client fw.<containers>.find(<query>)
+        if object_type is self.highest_level:
+            log.info("Entering case 1")
+            log.debug(f"\n{working_object.get('id')}\n{object_type}\n")
+            object = fh.find_flywheel_container(self.client, working_object.get("id"), object_type,
+                                                None)
+            working_object["obj"] = object
+            return object
+        
+        # Case 2, if from_container is none, recurse up to highest level:
+        if from_container is None:
+            log.info("entering case 2, finding from_container")
+            # First if the parent object has an object, then that's the from
+            if parent.get("obj") is not None:
+                log.info("parent object has objects")
+                from_container = parent.get("obj")
+
+            elif parent.get("obj") is None:
+                log.info("parent object is empty, will recurse to parent's parent")
+                new_type = parent.get("type")
+                new_from = parent.get("parent").get("obj")
+                log.info(
+                    f'parent object is none, switching from {object_type} to {new_type}, using from_conainer: {new_from}')
+                
+                # This should resolve...things...
+                from_container = self.process_matches(new_type, new_from)
+                parent["obj"] = from_container
+        
+        # Case 3, if this ID is blank, from_container is not none, we already know this isn't the 
+        # highest level, so we need to skip to the parent.
+        # Since case 2 takes care of the "from_container = None" condition, we...SHOULD always have
+        # from_containers...
+        # So I think we can just get the from_containers from the parent and pass them down a level?
+        
+        if working_object.get("id") is None:
+            log.info(f"entering case 3.  moving 'from containers' from parent to child")
+            log.info(f"container {working_object.get('type')} from containers are now {[p.label for p in parent.get('obj')]}")
+            working_object["obj"] = parent.get("obj")
+            return working_object["obj"]
+        
+        
+        # Case 4, we have a from_container and an id:
+        log.info(f"Case 4, searching for {object_type} on {parent.get('type')}")
+        object = []
+        for cont in parent.get("obj"):
+            object.extend(self.find_flywheel_container(working_object.get("id"), object_type, cont))
+        
+        working_object["obj"] = object
         return object
-    
-        
-        
-         
-        if self.project_str:
-            
-            if not self.group_obj:
-                # fw, name, level, on_container = None
-                project = fh.find_flywheel_container(self.client, self.project_str, 'project', None)
-            else:
-                project = []
-                for parent in self.group_obj:
-                    project.extend(fh.find_flywheel_container(self.client, self.project_str, 'project', parent))
-            
-            if project is None or project is []:
-                log.error(f"Unable to find a group with a label or ID {self.group_str}")
-                project = None
-                
-            self.project_obj = None
-            self.highest_level = 'project'
-            
-        
-    def find_subjects(self):
-        
-        if self.subject_str:
-            
-            if not self.project_obj:
-    
-                if not self.group_obj:
-                    subjects = fh.find_flywheel_container(self.client, self.subject_str, 'subject', None)
-                
-                else:   
-                    subjects = []
-                    for parent in self.group_obj:
-                        subjects.extend(fh.find_flywheel_container(self.client, self.subject_str, 'subject', parent))
-            
-            else:
-                subjects = []
-                for parent in self.project_obj:
-                    subjects.extend(
-                        fh.find_flywheel_container(self.client, self.subject_str, 'subject',
-                                                   parent))
-            
-            
-        
-        
-    def find_project(self):
-        
-        if self.project:
-            project = fh.find_flywheel_container(self.client, self.project, 'project',
-                                                 on_container=self.highest_container)
-            if project is None:
-                log.error(f"Unable to find a project with a label or ID {self.project}")
-                # raise Exception(f"Project {self.project} Does Not Exist")
 
-            self.project = project.reload()
-            highest_container = project.reload()
-            fw_object = project
-            
+    def find_flywheel_container(self, name, level, on_container=None):
+        """ Tries to locate a flywheel container at a certain level
 
-    def find_type(self, container_type):
+        Args:
+            name (str): the name (label or ID) of the container to find
+            level (str): Level at which to get the container (group, project, subject, session, acquisition)
+            on_container (flywheel.Container): a container to find the object on (used for files or analyses)
+
+        Returns: container (flywheel.Container): a flywheel container
+
+        """
         
-        if getattr(self, container_type):
-            container = fh.find_flywheel_container(self.client, getattr(self, container_type), container_type,
-                                               on_container=self.highest_container)
+        fw = self.client
+        level = level.lower()
+
+        found = False
+        print(name)
+        # In this function we require a container to search on if we're looking for an analysis.
+        if level == "analysis" and on_container is None:
+            log.warning(
+                'Cannot use find_flywheel_container() to find analysis without providing a container to search on')
+            return None
+
+        # In this function we require a container to search on if we're looking for a file.
+        if level == "file" and on_container is None:
+            log.warning(
+                'Cannot use find_flywheel_container() to find file without providing a container to search on')
+            return None
+
+        # If we're looking for a group:
+        if level == "group":
+            # Check if we're a group id or label (maybe, just guessing here at first)
+            # If the name is all lowercase, it might be an ID
+            if name.islower():
+                try:
+                    container = fw.get_group(name)
+                    found = True
+                except flywheel.ApiException:
+                    log.debug(f"group name {name} is not an ID.")
+                    found = False
+
+
+        elif level == "analysis" or level == "file":
+            container = self.run_finder_at_level(on_container, level, name)
+
+        if not found:
+            if re.match(self.CONTAINER_ID_FORMAT, name):
+                try:
+                    query = f"_id={name}"
+                    container = self.run_finder_at_level(on_container, level, query)
+                    if len(container) > 0:
+                        container = container[0]
+
+
+                except flywheel.ApiException:
+                    log.debug(f"{level} name {name} is not an ID.  Looking for Labels.")
+
+            if not found:
+                query = f"label=\"{name}\""
+                container = self.run_finder_at_level(on_container, level, query)
+                # log.info(container)
+
+        return container
+    
+    
+    def run_finder_at_level(self, container, level, query):
+        
+        fw = self.client
+        
+        if container is None:
+            ct = 'instance'
+        else:
+            try:
+                ct = container.container_type
+            except Exception:
+                ct = 'analysis'
+
+        log.info(
+            f"looking for {level} matching {query} on {ct}")
+
+        if ct == level:
+            return ([container])
+
+        if level == "acquisition":
+            log.info('querying acquisitions')
             if container is None:
-                log.error(f"Unable to find a {container_type} with a label or ID {getattr(self, container_type)}")
-                # raise Exception(f"Group {self.group} Does Not Exist")
+                containers = fw.acquisitions.find(query)
             else:
-                
+                # Expanding To Children
+                if ct == "project" or ct == "subject":
+                    containers = []
+                    temp_containers = container.sessions()
+                    for cont in temp_containers:
+                        containers.extend(cont.acquisitions.find(query))
+
+                elif ct == 'session':
+                    containers = container.acquisitions.find(query)
+
+                # No queries on parents
+                else:
+                    containers = [self.get_acquisition(container)]
+
+        elif level == "session":
+            log.info('querying sessions')
+            if container is None:
+                containers = [fw.sessions.find(query)]
+            else:
+                # Expanding To Children
+                if ct == "project" or 'subject':
+                    containers = container.sessions.find(query)
+
+                # Shrink to parent
+                else:
+                    containers = [self.get_session(container)]
+
+        elif level == "subject":
+            log.info('querying subjects')
+            if container is None:
+                log.info('container is None')
+                containers = fw.subjects.find(query)
+                log.info(containers)
+            else:
+                # Expanding To Children
+                if ct == "project":
+                    containers = container.subjects.find(query)
+
+                # Shrink to parent
+                else:
+                    containers = [self.get_subject(container)]
+
+        elif level == "project":
+            log.info('querying projects')
+            if container is None:
+                containers = fw.projects.find(query)
+            else:
+                # Expand group to children projects:
+                containers = container.projects.find(query)
+
+        elif level == "group":
+            log.info('querying groups')
+            containers = fw.groups.find(query)
 
 
-    def find(self, retry=False):
+        elif level == 'analysis':
+            log.info('matching analysis')
+            if container is None:
+                log.warning("Can't search for analyses without a parent container")
+                containers = [None]
+            else:
+                containers = [a for a in container.analyses if a.label == query]
 
-        highest_container = [None]
+        elif level == 'file':
+            log.info('matching file')
+            if container is None:
+                log.warning("Can't search for files without a parent container")
+                containers = [None]
+            else:
+                containers = [f for f in container.files if f.name == query]
+
+        return containers
+
+
+    def get_subject(self, container):
         
+        fw = self.client
 
+        if container is None:
+            subjects = fw.subjects()
+            return subjects
 
+        ct = container.get('container_type', 'analysis')
 
+        if ct == "group":
+            projects = container.projects()
+            subjects = []
+            for proj in projects:
+                subjects.extend(proj.subjects())
 
-        if self.subject:
-            subject = fh.find_flywheel_container(self.client, self.subject, 'subject',
-                                                 on_container=highest_container)
-            if subject is None:
-                log.error(f"Unable to find a subject with a label or ID {self.subject}")
-                # raise Exception(f"Subject {self.subject} Does Not Exist")
-
-            self.subject = subject.reload()
-            highest_container = subject.reload()
-            fw_object = subject
-
-        if self.session:
-            session = fh.find_flywheel_container(self.client, self.session, 'session',
-                                                 on_container=highest_container)
-            if session is None:
-                log.error(f"Unable to find a session with a label or ID {self.session}")
-                # raise Exception(f"session {self.session} Does Not Exist")
-
-            self.session = session.reload()
-            highest_container = session.reload()
-            fw_object = session
-
-        if self.acquisition:
-            acquisition = fh.find_flywheel_container(self.client, self.acquisition, 'acquisition',
-                                                     on_container=highest_container)
-            if acquisition is None:
-                log.error(f"Unable to find a acquisition with a label or ID {self.acquisition}")
-                # raise Exception(f"acquisition {self.acquisition} Does Not Exist")
-
-            self.acquisition = acquisition.reload()
-            highest_container = acquisition.reload()
-            fw_object = acquisition
-
-        if self.analysis:
-            analysis = fh.find_flywheel_container(self.client, self.analysis, 'analysis',
-                                                  on_container=highest_container)
-            if analysis is None:
-                log.error(f"Unable to find a analysis with a label or ID {self.analysis}")
-                # raise Exception(f"analysis {self.analysis} Does Not Exist")
-
-            self.analysis = analysis.reload()
-            highest_container = analysis.reload()
-            fw_object = analysis
-
-        if self.file:
-            
-            
-            file = fh.find_flywheel_container(self.client, self.file, 'file',
-                                              on_container=highest_container)
-            if file is None:
-                log.error(f"Unable to find a file with a label or ID {self.file}")
-                # raise Exception(f"file {self.file} Does Not Exist")
-                fw_object = None
+        elif ct == "project":
+            subject = container.subjects()
+        elif ct == "subject":
+            subject = [container]
+        elif ct == "session":
+            subject = [container.subject]
+        elif ct == "acquisition":
+            subject = [fw.get_subject(container.parents.subject)]
+        elif ct == "file":
+            subject = self.get_subject(container.parent.reload())
+        elif ct == "analysis":
+            sub_id = container.parents.subject
+            if sub_id is not None:
+                subject = [fw.get_subject(sub_id)]
             else:
-                self.file = file
-                fw_object = file
+                subject = None
 
-        return fw_object
+        return subject
+
+
+    def get_session(self, container):
+        
+        fw = self.client
+
+        if container is None:
+            session = fw.sessions()
+            return session
+
+        ct = container.get('container_type', 'analysis')
+
+        if ct == "group":
+            projects = container.projects()
+            session = []
+            for proj in projects:
+                session.extend(proj.sessions())
+
+        elif ct == "project":
+            session = container.sessions()
+
+        elif ct == "subject":
+            session = container.sessions()
+
+        elif ct == "session":
+            session = [container]
+
+        elif ct == "acquisition":
+            session = [fw.get_session(container.parents.session)]
+
+        elif ct == "file":
+            session = [self.get_session(container.parent.reload())]
+
+        elif ct == "analysis":
+            ses_id = container.parents.session
+            if ses_id is not None:
+                session = [fw.get_session(ses_id)]
+            else:
+                session = None
+
+        return session
+    
+
+    def get_acquisition(self, container):
+        
+        fw = self.client
+        if container is None:
+            acquisition = fw.acquisitions()
+            return acquisition
+
+        ct = container.get('container_type', 'analysis')
+
+        if ct == "group":
+            projects = container.projects()
+            acquisition = []
+            for proj in projects:
+                sessions = proj.sessions()
+                for ses in sessions:
+                    acquisition.extend(ses.acquisitions())
+
+        elif ct == "project":
+            acquisition = []
+            sessions = container.sessions()
+            for ses in sessions:
+                acquisition.extend(ses.acquisitions())
+
+        elif ct == "subject":
+            acquisition = []
+            sessions = container.sessions()
+            for ses in sessions:
+                acquisition.extend(ses.acquisitions())
+
+        elif ct == "session":
+            acquisition = container.acquisitions()
+
+        elif ct == "acquisition":
+            acquisition = [container]
+
+        elif ct == "file":
+            acquisition = self.get_acquisition(container.parent.reload())
+
+        elif ct == "analysis":
+            ses_id = container.parents.acquisition
+            if ses_id is not None:
+                acquisition = [fw.get_acquisition(ses_id)]
+            else:
+                acquisition = None
+
+        return acquisition
+
+    def get_analysis(self, container):
+        
+        ct = container.get('container_type', 'analysis')
+
+        if ct == "project":
+            analysis = container.analyses
+        elif ct == "subject":
+            analysis = container.analyses
+        elif ct == "session":
+            analysis = container.analyses
+        elif ct == "acquisition":
+            analysis = container.analyses
+        elif ct == "file":
+            analysis = self.get_analysis(container.parent.reload())
+        elif ct == "analysis":
+            analysis = [container]
+
+        return analysis
+    
+
+    def get_project(self, container):
+        
+        fw = self.client
+        
+        ct = container.get('container_type', 'analysis')
+
+        if ct == "project":
+            project = container
+        elif ct == "subject":
+            project = [fw.get_project(container.parents.project)]
+        elif ct == "session":
+            project = [fw.get_project(container.parents.project)]
+        elif ct == "acquisition":
+            project = [fw.get_project(container.parents.project)]
+        elif ct == "file":
+            project = self.get_project(container.parent.reload())
+        elif ct == "analysis":
+            project = [fw.get_project(container.parents.project)]
+
+        return project
+
+
 
 
 class DataMap:
@@ -437,30 +682,30 @@ def panda_pop(series, key, default=None):
     
     
     
-if __name__ == "__main__":
-    import utils.flywheel_helpers as fh
-    import logging
-    import collections
-    import flywheel
-    import utils.import_data as id
-    import numpy as np
-    import pandas as pd
-    import utils.mapping_class as mc
-    logging.basicConfig(level="INFO")
-    log = logging.getLogger()
-    log.setLevel("INFO")
-    df_path = '/Users/davidparker/Documents/Flywheel/SSE/MyWork/Gears/Metadata_import_Errorprone/matlab_metaimport/tests/Data_Import_Status_report_2.csv'
-    df = pd.read_table(df_path, delimiter=',')
-    mm = mc.MetadataMapper(project_column="Project",
-                        subject_column="Subject",
-                        session_column="Session",
-                        acquisition_column="Acquisition",
-                        analysis_column="Analysis",
-                        file_column="Image Index",
-                        import_columns='ALL')
-    
-    mappers = mm.map_data(df, 'Test1')
-    [m.write_metadata() for m in mappers]
+# if __name__ == "__main__":
+#     import utils.flywheel_helpers as fh
+#     import logging
+#     import collections
+#     import flywheel
+#     import utils.import_data as id
+#     import numpy as np
+#     import pandas as pd
+#     import utils.mapping_class as mc
+#     logging.basicConfig(level="INFO")
+#     log = logging.getLogger()
+#     log.setLevel("INFO")
+#     df_path = '/Users/davidparker/Documents/Flywheel/SSE/MyWork/Gears/Metadata_import_Errorprone/matlab_metaimport/tests/Data_Import_Status_report_2.csv'
+#     df = pd.read_table(df_path, delimiter=',')
+#     mm = mc.MetadataMapper(project_column="Project",
+#                         subject_column="Subject",
+#                         session_column="Session",
+#                         acquisition_column="Acquisition",
+#                         analysis_column="Analysis",
+#                         file_column="Image Index",
+#                         import_columns='ALL')
+#     
+#     mappers = mm.map_data(df, 'Test1')
+#     [m.write_metadata() for m in mappers]
 
 
 # import flywheel
@@ -486,3 +731,26 @@ if __name__ == "__main__":
 #         mt = self.thing
 #         mt["b"] = value
 #     
+
+
+def test_the_class():
+    import flywheel
+    import os
+    import logging
+    logging.basicConfig(level="DEBUG")
+    log = logging.getLogger()
+    log.setLevel("DEBUG")
+    
+    fw = flywheel.Client(os.environ["FWGA_API"])
+    test = FlywheelObjectFinder(fw=fw, project='img2dicom', acquisition='acq')
+    #test.session = '12-23-17 8:53 PM'
+    #test.project = 'Random Dicom Scans'
+    #test.group = 'scien'
+    result = test.find_object('acquisition')
+    print(result)
+    print(len(result))
+
+
+if __name__ == "__main__":
+    test_the_class()
+    

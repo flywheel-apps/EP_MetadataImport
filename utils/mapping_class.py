@@ -12,83 +12,119 @@ log = logging.getLogger()
 log.setLevel("DEBUG")
 
 
-
 class FlywheelObjectFinder:
-    def __init__(self, fw, group=None, project=None, subject=None, session=None,
-                 acquisition=None, analysis=None,
-                 file=None, level=None):
-        
+    def __init__(
+        self,
+        fw,
+        group=None,
+        project=None,
+        subject=None,
+        session=None,
+        acquisition=None,
+        analysis=None,
+        file=None,
+        level=None,
+    ):
+
         self.client = fw
 
         self.CONTAINER_ID_FORMAT = "^[0-9a-fA-F]{24}$"
         self.level = level
         self.object = None
         self.highest_container = None
-        self.lowest_level = 'file'
-        self.highest_level = 'group'
-        
-        self.group = {"id": group,
-                        "obj": None,
-                        "parent": None,
-                        "type": "group"}
+        self.lowest_level = "file"
+        self.highest_level = "group"
 
-        self.project = {"id": project,
-                        "obj": None,
-                        "parent": self.group,
-                        "type": "project"}
-        
-        self.subject = {"id": subject,
-                        "obj": None,
-                        "parent": self.project,
-                        "type": "subject"}
-        
-        self.session = {"id": session,
-                        "obj": None,
-                        "parent": self.subject,
-                        "type": "session"}
-        
-        self.acquisition = {"id": acquisition,
-                        "obj": None,
-                        "parent": self.session,
-                        "type": "acquisition"}
-        
-        self.file = {"id": file,
-                        "obj": None,
-                        "parent": self.lowest_level,
-                        "type": "file"}
-        
-        self.analysis = {"id": analysis,
-                        "obj": None,
-                        "parent": self.lowest_level,
-                        "type": "analysis"}
-        
-        
+        self.group = {"id": group, "obj": None, "parent": None, "type": "group"}
+
+        self.project = {
+            "id": project,
+            "obj": None,
+            "parent": self.group,
+            "type": "project",
+        }
+
+        self.subject = {
+            "id": subject,
+            "obj": None,
+            "parent": self.project,
+            "type": "subject",
+        }
+
+        self.session = {
+            "id": session,
+            "obj": None,
+            "parent": self.subject,
+            "type": "session",
+        }
+
+        self.acquisition = {
+            "id": acquisition,
+            "obj": None,
+            "parent": self.session,
+            "type": "acquisition",
+        }
+
+        self.file = {
+            "id": file,
+            "obj": None,
+            "parent": self.lowest_level,
+            "type": "file",
+        }
+
+        self.analysis = {
+            "id": analysis,
+            "obj": None,
+            "parent": self.lowest_level,
+            "type": "analysis",
+        }
 
         self.find_levels()
-    
-    
+
+        self.found_objects = None
+
+    def __str__(self):
+        string_out = ""
+        for key, val in self.__dict__.items():
+            if key in [
+                "file",
+                "analysis",
+                "acquisition",
+                "session",
+                "subject",
+                "project",
+                "group",
+            ]:
+                string_out += f"{key}: {val.get('id')}\n"
+            else:
+                string_out += f"{key}: {val}\n"
+
+        given_path = f"{self.group['id']}/{self.project['id']}/{self.subject['id']}/{self.session['id']}/{self.acquisition['id']}/{self.analysis['id']}/{self.file['id']}"
+        string_out += f"Given Path: {given_path}"
+
+        return string_out
+
     def check_for_file(self, container):
-        
+
         if self.file is not None:
-            ct = container.get('container_type', 'analysis')
-            
+            ct = container.get("container_type", "analysis")
+
             if self.level is not None and self.level == ct:
                 files = [f for f in container.files if f.name == self.file]
-            
+
             else:
                 files = [f for f in container.files if f.name == self.file]
-        
+
         else:
             files = []
-        
-        return files
 
+        return files
 
     def check_for_analysis(self, container):
 
         if self.analysis is not None:
-            
-            ct = container.get('container_type', 'analysis')
+
+            ct = container.get("container_type", "analysis")
             if self.level is not None and self.level == ct:
                 analyses = [a for a in container.analyses if a.label == self.analysis]
 
@@ -101,7 +137,7 @@ class FlywheelObjectFinder:
         return analyses
 
     def find_groups(self):
-        
+
         if self.group_str:
             if self.group_str.islower():
                 try:
@@ -109,20 +145,27 @@ class FlywheelObjectFinder:
                 except flywheel.ApiException:
                     log.debug(f"group name {self.group_str} is not an ID.")
 
-            group = fh.run_finder_at_level(self.client, None, 'group', self.group_str)
-            
+            group = fh.run_finder_at_level(self.client, None, "group", self.group_str)
+
             if group is None or group is []:
                 log.error(f"Unable to find a group with a label or ID {self.group_str}")
                 group = None
                 # raise Exception(f"Group {self.group} Does Not Exist")
-                
+
             self.group_obj = group
-            self.highest_level = 'group'
-    
-    
+            self.highest_level = "group"
+
     def find_levels(self):
-        order = ["group","project","subject","session","acquisition","analysis","file"]
-        
+        order = [
+            "group",
+            "project",
+            "subject",
+            "session",
+            "acquisition",
+            "analysis",
+            "file",
+        ]
+
         for o in order[::-1]:
             test_case = getattr(self, o)
             if test_case.get("id") is not None:
@@ -132,26 +175,29 @@ class FlywheelObjectFinder:
             test_case = getattr(self, o)
             if test_case.get("id") is not None:
                 self.lowest_level = o
-                
-        log.info(f'highest level is {self.highest_level}')
+
+        log.info(f"highest level is {self.highest_level}")
         log.info(f"lowest level is {self.lowest_level}")
 
-    
-    def process_matches(self, object_type, from_container=None):
-        
+    def process_matches(self, object_type=None, from_container=None):
+
+        if not object_type:
+            object_type = self.lowest_level
+
         working_object = getattr(self, object_type)
         parent = working_object.get("parent")
-                
+
         # Case 1, if this is the highest level that has a label provided, do a flywheel
         # client fw.<containers>.find(<query>)
         if object_type is self.highest_level:
             log.info("Entering case 1")
             log.debug(f"\n{working_object.get('id')}\n{object_type}\n")
-            object = fh.find_flywheel_container(self.client, working_object.get("id"), object_type,
-                                                None)
+            object = fh.find_flywheel_container(
+                self.client, working_object.get("id"), object_type, None
+            )
             working_object["obj"] = object
             return object
-        
+
         # Case 2, if from_container is none, recurse up to highest level:
         if from_container is None:
             log.info("entering case 2, finding from_container")
@@ -165,32 +211,40 @@ class FlywheelObjectFinder:
                 new_type = parent.get("type")
                 new_from = parent.get("parent").get("obj")
                 log.info(
-                    f'parent object is none, switching from {object_type} to {new_type}, using from_conainer: {new_from}')
-                
+                    f"parent object is none, switching from {object_type} to {new_type}, using from_conainer: {new_from}"
+                )
+
                 # This should resolve...things...
                 from_container = self.process_matches(new_type, new_from)
                 parent["obj"] = from_container
-        
-        # Case 3, if this ID is blank, from_container is not none, we already know this isn't the 
+
+        # Case 3, if this ID is blank, from_container is not none, we already know this isn't the
         # highest level, so we need to skip to the parent.
         # Since case 2 takes care of the "from_container = None" condition, we...SHOULD always have
         # from_containers...
         # So I think we can just get the from_containers from the parent and pass them down a level?
-        
+
         if working_object.get("id") is None:
             log.info(f"entering case 3.  moving 'from containers' from parent to child")
-            log.info(f"container {working_object.get('type')} from containers are now {[p.label for p in parent.get('obj')]}")
+            log.info(
+                f"container {working_object.get('type')} from containers are now {[p.label for p in parent.get('obj')]}"
+            )
             working_object["obj"] = parent.get("obj")
             return working_object["obj"]
-        
-        
+
         # Case 4, we have a from_container and an id:
         log.info(f"Case 4, searching for {object_type} on {parent.get('type')}")
         object = []
         for cont in parent.get("obj"):
-            object.extend(self.find_flywheel_container(working_object.get("id"), object_type, cont))
-        
+            object.extend(
+                self.find_flywheel_container(
+                    working_object.get("id"), object_type, cont
+                )
+            )
+
         working_object["obj"] = object
+
+        self.found_objects = object
         return object
 
     def find_flywheel_container(self, name, level, on_container=None):
@@ -204,7 +258,7 @@ class FlywheelObjectFinder:
         Returns: container (flywheel.Container): a flywheel container
 
         """
-        
+
         fw = self.client
         level = level.lower()
 
@@ -213,13 +267,15 @@ class FlywheelObjectFinder:
         # In this function we require a container to search on if we're looking for an analysis.
         if level == "analysis" and on_container is None:
             log.warning(
-                'Cannot use find_flywheel_container() to find analysis without providing a container to search on')
+                "Cannot use find_flywheel_container() to find analysis without providing a container to search on"
+            )
             return None
 
         # In this function we require a container to search on if we're looking for a file.
         if level == "file" and on_container is None:
             log.warning(
-                'Cannot use find_flywheel_container() to find file without providing a container to search on')
+                "Cannot use find_flywheel_container() to find file without providing a container to search on"
+            )
             return None
 
         # If we're looking for a group:
@@ -234,7 +290,6 @@ class FlywheelObjectFinder:
                     log.debug(f"group name {name} is not an ID.")
                     found = False
 
-
         elif level == "analysis" or level == "file":
             container = self.run_finder_at_level(on_container, level, name)
 
@@ -246,38 +301,35 @@ class FlywheelObjectFinder:
                     if len(container) > 0:
                         container = container[0]
 
-
                 except flywheel.ApiException:
                     log.debug(f"{level} name {name} is not an ID.  Looking for Labels.")
 
             if not found:
-                query = f"label=\"{name}\""
+                query = f'label="{name}"'
                 container = self.run_finder_at_level(on_container, level, query)
                 # log.info(container)
 
         return container
-    
-    
+
     def run_finder_at_level(self, container, level, query):
-        
+
         fw = self.client
-        
+
         if container is None:
-            ct = 'instance'
+            ct = "instance"
         else:
             try:
                 ct = container.container_type
             except Exception:
-                ct = 'analysis'
+                ct = "analysis"
 
-        log.info(
-            f"looking for {level} matching {query} on {ct}")
+        log.info(f"looking for {level} matching {query} on {ct}")
 
         if ct == level:
-            return ([container])
+            return [container]
 
         if level == "acquisition":
-            log.info('querying acquisitions')
+            log.info("querying acquisitions")
             if container is None:
                 containers = fw.acquisitions.find(query)
             else:
@@ -288,7 +340,7 @@ class FlywheelObjectFinder:
                     for cont in temp_containers:
                         containers.extend(cont.acquisitions.find(query))
 
-                elif ct == 'session':
+                elif ct == "session":
                     containers = container.acquisitions.find(query)
 
                 # No queries on parents
@@ -296,12 +348,12 @@ class FlywheelObjectFinder:
                     containers = [self.get_acquisition(container)]
 
         elif level == "session":
-            log.info('querying sessions')
+            log.info("querying sessions")
             if container is None:
                 containers = [fw.sessions.find(query)]
             else:
                 # Expanding To Children
-                if ct == "project" or 'subject':
+                if ct == "project" or "subject":
                     containers = container.sessions.find(query)
 
                 # Shrink to parent
@@ -309,9 +361,9 @@ class FlywheelObjectFinder:
                     containers = [self.get_session(container)]
 
         elif level == "subject":
-            log.info('querying subjects')
+            log.info("querying subjects")
             if container is None:
-                log.info('container is None')
+                log.info("container is None")
                 containers = fw.subjects.find(query)
                 log.info(containers)
             else:
@@ -324,7 +376,7 @@ class FlywheelObjectFinder:
                     containers = [self.get_subject(container)]
 
         elif level == "project":
-            log.info('querying projects')
+            log.info("querying projects")
             if container is None:
                 containers = fw.projects.find(query)
             else:
@@ -332,20 +384,19 @@ class FlywheelObjectFinder:
                 containers = container.projects.find(query)
 
         elif level == "group":
-            log.info('querying groups')
+            log.info("querying groups")
             containers = fw.groups.find(query)
 
-
-        elif level == 'analysis':
-            log.info('matching analysis')
+        elif level == "analysis":
+            log.info("matching analysis")
             if container is None:
                 log.warning("Can't search for analyses without a parent container")
                 containers = [None]
             else:
                 containers = [a for a in container.analyses if a.label == query]
 
-        elif level == 'file':
-            log.info('matching file')
+        elif level == "file":
+            log.info("matching file")
             if container is None:
                 log.warning("Can't search for files without a parent container")
                 containers = [None]
@@ -354,16 +405,15 @@ class FlywheelObjectFinder:
 
         return containers
 
-
     def get_subject(self, container):
-        
+
         fw = self.client
 
         if container is None:
             subjects = fw.subjects()
             return subjects
 
-        ct = container.get('container_type', 'analysis')
+        ct = container.get("container_type", "analysis")
 
         if ct == "group":
             projects = container.projects()
@@ -390,16 +440,15 @@ class FlywheelObjectFinder:
 
         return subject
 
-
     def get_session(self, container):
-        
+
         fw = self.client
 
         if container is None:
             session = fw.sessions()
             return session
 
-        ct = container.get('container_type', 'analysis')
+        ct = container.get("container_type", "analysis")
 
         if ct == "group":
             projects = container.projects()
@@ -430,16 +479,15 @@ class FlywheelObjectFinder:
                 session = None
 
         return session
-    
 
     def get_acquisition(self, container):
-        
+
         fw = self.client
         if container is None:
             acquisition = fw.acquisitions()
             return acquisition
 
-        ct = container.get('container_type', 'analysis')
+        ct = container.get("container_type", "analysis")
 
         if ct == "group":
             projects = container.projects()
@@ -480,8 +528,8 @@ class FlywheelObjectFinder:
         return acquisition
 
     def get_analysis(self, container):
-        
-        ct = container.get('container_type', 'analysis')
+
+        ct = container.get("container_type", "analysis")
 
         if ct == "project":
             analysis = container.analyses
@@ -497,35 +545,126 @@ class FlywheelObjectFinder:
             analysis = [container]
 
         return analysis
-    
 
     def get_project(self, container):
-        
+
         fw = self.client
-        
-        ct = container.get('container_type', 'analysis')
+
+        ct = container.get("container_type", "analysis")
 
         if ct == "project":
             project = container
         elif ct == "subject":
-            project = [fw.get_project(container.parents.project)]
+            project = fw.get_project(container.parents.project)
         elif ct == "session":
-            project = [fw.get_project(container.parents.project)]
+            project = fw.get_project(container.parents.project)
         elif ct == "acquisition":
-            project = [fw.get_project(container.parents.project)]
+            project = fw.get_project(container.parents.project)
         elif ct == "file":
             project = self.get_project(container.parent.reload())
         elif ct == "analysis":
-            project = [fw.get_project(container.parents.project)]
+            project = fw.get_project(container.parents.project)
 
         return project
 
+    def generate_path_to_container(self, parent_container=None):
+        fw = self.client
+        fw_paths = []
 
+        if parent_container is None:
+            log.debug('parent container is None, using self.found_objects:')
+            log.debug(f"found {len(self.found_objects)} objects")
+            containers_to_loop = self.found_objects
+        else:
+            log.debug(f'parent container is present. type {type(parent_container)} ')
+            containers_to_loop = [parent_container]
+
+        for container in containers_to_loop:
+            try:
+                ct = container.container_type
+                log.debug(f"container type is {ct}")
+            except Exception:
+                log.debug('container type is assumed to be analysis')
+                ct = "analysis"
+
+            if ct == "file":
+                path_to_file = self.generate_path_to_container(
+                    container.parent.reload()
+                )
+                path_to_file = path_to_file[0]
+                fw_path = f"{path_to_file}/{container.name}"
+
+            else:
+                fw_path = ""
+
+                if container.parents.group is not None:
+                    append = container.parents.group
+                else:
+                    append = ""
+
+                fw_path += append
+
+                if container.parents.project is not None:
+                    project = self.get_project(container)
+                    append = f"/{project.label}"
+                else:
+                    append = ""
+
+                fw_path += append
+
+                if container.parents.subject is not None:
+                    subject = self.get_subject(container)[0]
+                    append = f"/{subject.label}"
+                else:
+                    append = ""
+
+                fw_path += append
+
+                if container.parents.session is not None:
+                    session = self.get_session(container)[0]
+                    append = f"/{session.label}"
+                else:
+                    append = ""
+
+                fw_path += append
+
+                if container.parents.acquisition is not None:
+                    acquisition = self.get_acquisition(container)[0]
+                    append = f"/{acquisition.label}"
+                else:
+                    append = ""
+
+                fw_path += append
+
+                if container.get("container_type", "analysis") == "analysis":
+                    analysis = container.label
+                    append = f"/{analysis}"
+                else:
+                    analysis = ""
+
+                fw_path += append
+
+            fw_paths.append(fw_path)
+
+        return fw_paths
 
 
 class DataMap:
-    def __init__(self, fw, data, group=None, project=None, subject=None, session=None, acquisition=None, analysis=None,
-                 file=None, info=False, namespace=''):
+    def __init__(
+        self,
+        fw,
+        data,
+        group=None,
+        project=None,
+        subject=None,
+        session=None,
+        acquisition=None,
+        analysis=None,
+        file=None,
+        info=False,
+        namespace="",
+    ):
+
         self.group = group
         self.project = project
         self.subject = subject
@@ -536,70 +675,169 @@ class DataMap:
         self.data = data
         self.info = info
         self.fw = fw
-        self.namespace = namespace
-        highest_container = None
-        
 
-    
-    def write_metadata(self, overwrite = False):
+        self.namespace = namespace
+
+        self.finder = FlywheelObjectFinder(
+            fw=fw,
+            group=group,
+            project=project,
+            subject=subject,
+            session=session,
+            acquisition=acquisition,
+            analysis=analysis,
+            file=file,
+            level=None,
+        )
+
+        self.found_object = None
+
+        highest_container = None
+
+    def find(self):
+
+        self.found_object = self.finder.process_matches()
+        given_path = self.generate_path_from_given_info()
+
+        log.debug(f"Given Path:\n{given_path}\n\n")
+
+        found_paths = self.finder.generate_path_to_container()
+        log.debug("Found Paths:\n")
+
+        for fp in found_paths:
+            log.debug(f"{fp}")
+        log.debug("\n\n")
+
+        log.debug(f"")
+
+    def generate_path_from_given_info(self):
+        items = [
+            self.group,
+            self.project,
+            self.subject,
+            self.session,
+            self.acquisition,
+            self.analysis,
+            self.file,
+        ]
+
+        path_str = ""
+        for i in items:
+            if i is None:
+                path_str += "/None"
+            else:
+                path_str += f"/{i}"
+
+        return path_str
+
+    def write_metadata(self, overwrite=False):
+
+        if self.found_object is None:
+            self.find()
+
+        fw_object = self.finder.process_matches()
         
-        fw_object = self.find_flywheel_object()
         if fw_object is not None:
+            if len(fw_object) > 1:
+                log.warning("Multiple matches found.  Cannont write.")
+                pass
+            
+            fw_object = fw_object[0]
             update_dict = self.make_meta_dict()
-            object_info = fw_object.get('info')
+            object_info = fw_object.get("info")
             if not object_info:
                 object_info = dict()
-            
+
             print(object_info)
-            object_info = id.update(object_info, update_dict, overwrite)
+            object_info = self.update(object_info, update_dict, overwrite)
             print(object_info)
             fw_object.update_info(object_info)
-        
-    
+
     def make_meta_dict(self):
         
-        output_dict = {self.namespace: self.data.to_dict()}
-        output_dict = cleanse_the_filthy_numpy(output_dict)
-        return output_dict
+        if not self.namespace and not self.info:
+            log.error('data mapper property `info` must be set to True if '
+                      'no namespace is provided for metadata upload')
+            pass
         
-        
+        if self.info:
+            if isinstance(self.data, pd.Series):
+                output_dict = self.data.to_dict()
+            else:
+                output_dict = self.data
 
-def cleanse_the_filthy_numpy(dict):
-    """change inputs that are numpy classes to python classes
-
-    when you read a csv with Pandas, it makes "int" "numpy_int", and flywheel doesn't like that.
-    Does the same for floats and bools, I think.  This fixes it
-
-    Args:
-        dict (dict): a dict
-
-    Returns:
-        dict (dict): a dict made of only python-base classes.
-
-    """
-    for k, v in dict.items():
-        if isinstance(v, collections.abc.Mapping):
-            dict[k] = cleanse_the_filthy_numpy(dict.get(k, {}))
         else:
-            # Flywheel doesn't like numpy data types:
-            if type(v).__module__ == np.__name__:
-                v = v.item()
-                dict[k] = v
-    return dict
-        
-
+            if isinstance(self.data, pd.Series):
+                output_dict = {self.namespace: self.data.to_dict()}
+            else:
+                output_dict = {self.namespace: self.data}
             
-        
-    
+            
+        output_dict = self.cleanse_the_filthy_numpy(output_dict)
+        return output_dict
 
-        
+    def update(self,d, u, overwrite):
+    
+        for k, v in u.items():
+            if isinstance(v, collections.abc.Mapping):
+                d[k] = self.update(d.get(k, {}), v, overwrite)
+            else:
+                # Flywheel doesn't like numpy data types:
+                if type(v).__module__ == np.__name__:
+                    v = v.item()
+    
+                log.debug(f'checking if "{k}" in {d.keys()}')
+                if k in d:
+                    if overwrite:
+                        log.debug(f'Overwriting "{k}" from "{d[k]}" to "{v}"')
+                        d[k] = v
+                    else:
+                        log.debug(f'"{k}" present.  Skipping.')
+                else:
+                    log.debug(f"setting {k}")
+                    d[k] = v
+    
+        return d
+    
+    
+    def cleanse_the_filthy_numpy(self, dict):
+        """change inputs that are numpy classes to python classes
+    
+        when you read a csv with Pandas, it makes "int" "numpy_int", and flywheel doesn't like that.
+        Does the same for floats and bools, I think.  This fixes it
+    
+        Args:
+            dict (dict): a dict
+    
+        Returns:
+            dict (dict): a dict made of only python-base classes.
+    
+        """
+        for k, v in dict.items():
+            if isinstance(v, collections.abc.Mapping):
+                dict[k] = self.cleanse_the_filthy_numpy(dict.get(k, {}))
+            else:
+                # Flywheel doesn't like numpy data types:
+                if type(v).__module__ == np.__name__:
+                    v = v.item()
+                    dict[k] = v
+        return dict
 
 
 
 class MetadataMapper:
-    def __init__(self, group_column=None, project_column=None, subject_column=None, session_column=None, acquisition_column=None,
-                 analysis_column=None, file_column=None, import_columns='ALL'):
-        
+    def __init__(
+        self,
+        group_column=None,
+        project_column=None,
+        subject_column=None,
+        session_column=None,
+        acquisition_column=None,
+        analysis_column=None,
+        file_column=None,
+        import_columns="ALL",
+    ):
+
         self.subject_column = subject_column
         self.session_column = session_column
         self.acquisition_column = acquisition_column
@@ -609,7 +847,7 @@ class MetadataMapper:
         self.group_column = group_column
         self.import_columns = import_columns
         self.fw = flywheel.Client()
-    
+
     def map_data(self, data, namespace):
         """
         
@@ -619,19 +857,20 @@ class MetadataMapper:
         Returns: mappers (list): a list of mapped metadata items
 
         """
-        data.fillna('', inplace=True)
+
+        data.fillna("", inplace=True)
         nrows, ncols = data.shape
         log.info("Starting Mapping")
 
-        data['Gear_Status'] = 'Failed'
-        data['Gear_FW_Location'] = None
+        data["Gear_Status"] = "Failed"
+        data["Gear_FW_Location"] = None
 
         success_counter = 0
-    
+
         mappers = []
         for row in range(nrows):
             data_row = data.iloc[row]
-            #print(data_row)
+            # print(data_row)
             group = panda_pop(data_row, self.group_column)
             project = panda_pop(data_row, self.project_column)
             subject = panda_pop(data_row, self.subject_column)
@@ -639,23 +878,26 @@ class MetadataMapper:
             acquisition = panda_pop(data_row, self.acquisition_column)
             analysis = panda_pop(data_row, self.analysis_column)
             file = panda_pop(data_row, self.file_column)
-            
-            if self.import_columns == 'ALL':
+
+            if self.import_columns == "ALL":
                 import_data = data_row
             else:
                 import_data = data.get(self.import_columns)
-                
-            
-            mappers.append(DataMap(fw = self.fw,
-                                   data = import_data,
-                                   group = group,
-                                   project = project,
-                                   subject = subject,
-                                   session = session,
-                                   acquisition = acquisition,
-                                   analysis = analysis,
-                                   file = file,
-                                   namespace = namespace))
+
+            mappers.append(
+                DataMap(
+                    fw=self.fw,
+                    data=import_data,
+                    group=group,
+                    project=project,
+                    subject=subject,
+                    session=session,
+                    acquisition=acquisition,
+                    analysis=analysis,
+                    file=file,
+                    namespace=namespace,
+                )
+            )
         return mappers
 
 
@@ -665,7 +907,7 @@ def panda_pop(series, key, default=None):
     behavior:
     if element exists, return the value and remove the element
     if the element doesn't exist, return the default
-    the default default is "None"
+    the default... uh... default is "None"
     
     Args:
         series (pandas.Series): The series to pop from
@@ -679,9 +921,8 @@ def panda_pop(series, key, default=None):
         return series.pop(key)
     else:
         return default
-    
-    
-    
+
+
 # if __name__ == "__main__":
 #     import utils.flywheel_helpers as fh
 #     import logging
@@ -703,22 +944,22 @@ def panda_pop(series, key, default=None):
 #                         analysis_column="Analysis",
 #                         file_column="Image Index",
 #                         import_columns='ALL')
-#     
+#
 #     mappers = mm.map_data(df, 'Test1')
 #     [m.write_metadata() for m in mappers]
 
 
 # import flywheel
 # import os
-# 
+#
 # fw = flywheel.Client(os.environ['ROLLOUT_API'])
-# 
+#
 # project_id = '6037d56c6e67757f166e8aa6'
 # project = fw.get_project(project_id)
-# 
-# projects = fw.projects.find(f"{project.id}")
+#
+# projects = fw.projects.find(f"{project['id']}")
 # print([p.label for p in projects])
-# 
+#
 # subjects = fw.subjects.find_one(id="605b4e735f814b5297ddf283")
 
 
@@ -726,31 +967,57 @@ def panda_pop(series, key, default=None):
 #     def __init__(self):
 #         self.thing = {"a":1,
 #                       "b": None }
-#     
+#
 #     def operate(self,value):
 #         mt = self.thing
 #         mt["b"] = value
-#     
+#
 
 
 def test_the_class():
     import flywheel
     import os
     import logging
+
     logging.basicConfig(level="DEBUG")
     log = logging.getLogger()
     log.setLevel("DEBUG")
-    
+
     fw = flywheel.Client(os.environ["FWGA_API"])
-    test = FlywheelObjectFinder(fw=fw, project='img2dicom', acquisition='acq')
-    #test.session = '12-23-17 8:53 PM'
-    #test.project = 'Random Dicom Scans'
-    #test.group = 'scien'
-    result = test.find_object('acquisition')
-    print(result)
+    test = FlywheelObjectFinder(fw=fw, project="img2dicom", acquisition="acq")
+    print(test)
+    # test.session = '12-23-17 8:53 PM'
+    # test.project = 'Random Dicom Scans'
+    # test.group = 'scien'
+    result = test.process_matches()
+    # print(result)
     print(len(result))
 
+def test_the_datamap():
 
-if __name__ == "__main__":
-    test_the_class()
+    import flywheel
+    import os
+    import logging
+
+    logging.basicConfig(level="DEBUG")
+    log = logging.getLogger()
+    log.setLevel("DEBUG")
+
+    fw = flywheel.Client(os.environ["FWGA_API"])
+    test = DataMap(fw=fw, data={'test': True}, project="img2dicom", acquisition="acq")
+    test.namespace='SubLevel'
+    test.find()
+    test.write_metadata()
+    # test.session = '12-23-17 8:53 PM'
+    # test.project = 'Random Dicom Scans'
+    # test.group = 'scien'
+    #result = test.process_matches()
+    # print(result)
     
+    print(len(test.found_object))
+    
+    
+    
+if __name__ == "__main__":
+    test_the_datamap()
+    #test_the_class()

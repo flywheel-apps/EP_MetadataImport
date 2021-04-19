@@ -113,8 +113,7 @@ if __name__ == "__main__":
 
     # project_id = '5daa044a69d4f3002a16ea93'
     # project = fw.get_project(project_id)
-    # 
+    
     # yaml_file = "/Users/davidparker/Documents/Flywheel/SSE/MyWork/Gears/UM_MetadataImport/demo_yaml.yaml"
     # excel_file = "/Users/davidparker/Documents/Flywheel/SSE/MyWork/Gears/UM_MetadataImport/PreClinical_UploadExample.xlsx"
-    # 
     # main(project, yaml_file, excel_file)

@@ -7,11 +7,14 @@
   "license": "MIT",
   "source": "https://github.com/flywheel-apps/EP_MetadataImport",
   "url": "https://github.com/flywheel-apps/EP_MetadataImport",
-  "version": "1.0.0a",
+  "version": "1.0.2",
   "custom": {
     "gear-builder": {
       "category": "analysis",
       "image": "flywheel/import_meatadata_b:1.0.0"   
+    },
+    "flywheel": {
+      "suite": "Metadata I/O"
     }
   },
   

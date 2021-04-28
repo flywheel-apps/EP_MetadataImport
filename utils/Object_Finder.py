@@ -301,20 +301,21 @@ class FlywheelObjectFinder:
 
             
             
-    def process_matches2(self, container_object=None, from_containers=None):
-        """
+    def process_matches(self, container_object=None, from_containers=None):
+        """ The main function that searches for a flywheel object with the provided
+        information.
 
+        Args:
+            object_type (string): The type of the flywheel object we're looking for. Can
+            be "group", "project", "subject", "session", "acquisition", "analysis", or
+            "file".
 
-        self.processing_level = None
-        case 1: processing level is None. Process highest level
+            from_container (flywheel.ContainerReference):  A flywheel container to start
+            the search from.  If present, this function will attempt to use the finders
+            on that container, otherwise the client's finders will be used.
 
-        1. find containers mathcing "ID" for highest level
-        2. Go to child level.  If ID is blank, parent "obj" becomes child "obj".  If ID is not blank, parent
-        "obj" becomes child "from_container"
-
-        Case 2: recursive call on to process child
-        Process: If ID is present,
-
+        Returns: object (list) a list of all objects found that match the provided
+        search criteria.
 
         """
         
@@ -327,174 +328,40 @@ class FlywheelObjectFinder:
         
         
         current_level = container_object.get("type")
+    
+
+        log.info(f"Entering Case 1, current level is {current_level}")
         
-        # Case 1: container_object has an ID, get those matching containers:
-        #if container_object.get("id") is not None:
-        if True:
-            log.info(f"Entering Case 1, current level is {current_level}")
-            
-            found_containers = self.find_flywheel_container(name=container_object.get("id"),
-                                                            level=current_level,
-                                                            on_containers=from_containers)
-            
-            # Matching containers become our new from_containers
-            log.info("Setting 'from_containers' to the found containers")
-            from_containers = found_containers
+        found_containers = self.find_flywheel_container(name=container_object.get("id"),
+                                                        level=current_level,
+                                                        on_containers=from_containers)
         
-            # If this is lowest level, we're at the bottom. return.
-            if container_object.get("type") == self.lowest_level:
-                log.info("Bottom of stack.")
-                return found_containers
-                
-            # Otherwise we re-call this function with the child container as the "container_object"
-            log.info("getting child")
-            child = container_object.get("child")
+        # Matching containers become our new from_containers
+        log.info("Setting 'from_containers' to the found containers")
+        from_containers = found_containers
+    
+        # If this is lowest level, we're at the bottom. return.
+        if container_object.get("type") == self.lowest_level:
+            log.info("Bottom of stack.")
+            return found_containers
             
-            # If there's no child, we probably messed up, because this should only happen at the lowest level
-            if child is None:
-                log.warning(f"No child for {container_object.type}, but also not lowest level {self.lowest_level}")
-                return found_containers
-            
-            log.info("recusrive entrance")
-            found_containers = self.process_matches2(child, from_containers)
+        # Otherwise we re-call this function with the child container as the "container_object"
+        log.info("getting child")
+        child = container_object.get("child")
         
-        # # Case 2 If id is none, this container must be the provided "level"
-        # else:
-        #     log.info("entering case 2")
-        #     
-        #     log.info(f"getting all containers of level {current_level} from 'from_containers'")
-        #     found_containers = self.find_flywheel_container(name=container_object.get("id"),
-        #                                                     level=current_level,
-        #                                                     on_containers=from_containers)
-        # 
-        #     from_containers = found_containers
-            
+        # If there's no child, we probably messed up, because this should only happen at the lowest level
+        if child is None:
+            log.warning(f"No child for {container_object.type}, but also not lowest level {self.lowest_level}")
+            return found_containers
+        
+        log.info("recusrive entrance")
+        found_containers = self.process_matches2(child, from_containers)
+        
+
         return found_containers
             
            
             
-            
-            
-            
-            
-        
-
-    
-    def process_matches(self, object_type=None, from_container=None):
-        """ The main function that searches for a flywheel object with the provided
-        information.
-        
-        Args:
-            object_type (string): The type of the flywheel object we're looking for. Can
-            be "group", "project", "subject", "session", "acquisition", "analysis", or
-            "file".
-            
-            from_container (flywheel.ContainerReference):  A flywheel container to start
-            the search from.  If present, this function will attempt to use the finders
-            on that container, otherwise the client's finders will be used.
-
-        Returns: object (list) a list of all objects found that match the provided
-        search criteria.
-
-        """
-
-        # If no object_type is provided, we are initializing our search, and so we will
-        # start from the lowest level provided
-        if not object_type:
-            object_type = self.lowest_level
-        
-        # Get the currently stored value for the provided "object_type" (will be empty
-        # If this is the first run through)
-        working_object = getattr(self, object_type)
-        parent = working_object.get("parent")
-
-        # Case 1, if this is the highest level that has a label provided, do a flywheel
-        # client fw.<containers>.find(<query>)
-        if object_type is self.highest_level:
-            log.info("Entering case 1")
-            log.debug(f"\n{working_object.get('id')}\n{object_type}\n")
-            object = self.find_flywheel_container(working_object.get("id"), object_type, None
-            )
-            working_object["obj"] = object
-            return object
-
-        # Case 2, if from_container is none, recurse up to highest level:
-        if from_container is None:
-            log.info("entering case 2, finding from_container")
-            # First if the parent object has an object, then that's the from
-            if parent.get("obj") is not None:
-                log.info("parent object has objects")
-                from_container = parent.get("obj")
-
-            elif parent.get("obj") is None:
-                log.info("parent object is empty, will recurse to parent's parent")
-                new_type = parent.get("type")
-                new_from = parent.get("parent").get("obj")
-                log.info(
-                    f"parent object is none, switching from {object_type} to {new_type}, using from_conainer: {new_from}"
-                )
-
-                # This should resolve...things...
-                from_container = self.process_matches(new_type, new_from)
-                parent["obj"] = from_container
-
-        # Case 3:
-        # 1. if this ID is blank (meaning No search info provided for this level)
-        # 2. from_container is not none (meaning it has a parent container)
-        # 3. BUT this container's level is the "level" we've specified our file/analysis to be on:
-        # Take all children containers that are of level "self.level" from "from_container" and 
-        # pass those on as our new "from_containers"
-        # pass these from_containers down a level?
-        
-
-        if working_object.get("id") is None and working_object.get("type") == self.level:
-            
-            log.info(f"entering case 3.  Expanding 'from containers' to children at leven {self.level}")
-
-            from_containers = []
-            for cont in working_object.get("from_container"):
-                object.extend(
-                    self.find_flywheel_container(
-                        working_object.get("id"), object_type, cont
-                    )
-                )
-
-            working_object["obj"] = object
-
-            self.found_objects = object
-            
-            working_object["obj"] = parent.get("obj")
-            return working_object["obj"]
-            
-            
-        # Case 4:
-        # 1. if this ID is blank (meaning No search info provided for this level)
-        # 2. from_container is not none (meaning it has a parent container)
-        # pass these from_containers down a level
-        
-        elif working_object.get("id") is None:
-            log.info(f"entering case 4.  moving 'from containers' from parent to child")
-            log.info(
-                f"container {working_object.get('type')} from containers are now {[p.label for p in parent.get('obj')]}"
-            )
-            working_object["obj"] = parent.get("obj")
-            return working_object["obj"]
-
-        # Case 5, we have a from_container and an id:
-        log.info(f"Case 5, searching for {object_type} on {parent.get('type')}")
-        object = []
-        for cont in parent.get("obj"):
-            object.extend(
-                self.find_flywheel_container(
-                    working_object.get("id"), object_type, cont
-                )
-            )
-
-        working_object["obj"] = object
-
-        self.found_objects = object
-        return object
-
 
     def check_for_file(self, container):
         """

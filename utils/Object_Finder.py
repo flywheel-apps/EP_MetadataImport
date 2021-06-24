@@ -121,6 +121,9 @@ class FlywheelObjectFinder:
     def find_levels(self):
         """ Finds the highest and lowest flywheel object levels given
         
+        This performs most of the logic that allows for a relatively simple
+        orchestration function "process_matches()"
+        
         a level is considered "given" if that level has a specified label to use for
         a query.
         
@@ -347,6 +350,7 @@ class FlywheelObjectFinder:
         found_containers = self.process_matches2(child, from_containers)
 
         return found_containers
+    
 
     def check_for_file(self, container):
         """

@@ -12,7 +12,8 @@
     "gear-builder": {
       "category": "analysis",
       "image": "flywheel/import_meatadata_b:1.0.0"   
-    }
+    },
+    "flywheel": {"suite": "Metadata I/O"}
   },
   
   "inputs": {

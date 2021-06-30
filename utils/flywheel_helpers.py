@@ -43,8 +43,10 @@ def get_containers_at_level(fw, container, level):
             containers = [get_subject(fw, container)]
 
     elif level == 'analysis':
+        container = container.reload()
         containers = container.analyses
     elif level == 'file':
+        container = container.reload()
         containers = container.files
     
     return containers

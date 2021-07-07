@@ -1,4 +1,6 @@
+import logging
 
+log = logging.getLogger()
 
 def get_containers_at_level(fw, container, level):
     try:
@@ -15,7 +17,7 @@ def get_containers_at_level(fw, container, level):
             containers = []
             temp_containers = fw.sessions.find(f"parents.{ct}={container.id}")
             for cont in temp_containers:
-                containers.extend(cont.acquisitions())
+                containers.extend(cont.reload().acquisitions())
                 
         elif ct == 'session':
             containers = container.acquisitions()
@@ -43,11 +45,11 @@ def get_containers_at_level(fw, container, level):
             containers = [get_subject(fw, container)]
 
     elif level == 'analysis':
-        container = container.reload()
         containers = container.analyses
     elif level == 'file':
-        container = container.reload()
+        log.debug(f'Looking for files on container {container.label}')
         containers = container.files
+        log.debug(f"found {len(containers)}")
     
     return containers
             

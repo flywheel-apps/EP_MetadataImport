@@ -70,7 +70,7 @@ def import_data(fw,
         name = 'name'
     else:
         name = 'label'
-        
+    log.debug(f'found {len(objects_for_processing)} things to search')
     nrows, ncols = df.shape
     log.info("Starting Mapping")
     

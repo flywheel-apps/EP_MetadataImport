@@ -15,7 +15,7 @@ def get_containers_at_level(fw, container, level):
         # Expanding To Children
         if ct == "project" or ct == "subject":
             containers = []
-            temp_containers = fw.sessions.find(f"parents.{ct}={container.id}")
+            temp_containers = fw.sessions.iter_find(f"parents.{ct}={container.id}")
             for cont in temp_containers:
                 containers.extend(cont.reload().acquisitions())
                 
@@ -29,7 +29,7 @@ def get_containers_at_level(fw, container, level):
     elif level == "session":
         # Expanding To Children
         if ct == "project" or 'subject':
-            containers = fw.sessions.find(f"parents.{ct}={container.id}")
+            containers = fw.sessions.iter_find(f"parents.{ct}={container.id}")
         
         # Shrink to parent
         else:

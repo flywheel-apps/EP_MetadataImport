@@ -44,7 +44,7 @@ def main(context):
         
     valid_name = valid_name.replace(' ', '_')
     
-    dry_run = config.get('dry-run', False)
+    dry_run = config.get('dry_run', False)
     log.debug(f"dry_run is {dry_run}")
     
     first_row = config.get('first_row', 0)
